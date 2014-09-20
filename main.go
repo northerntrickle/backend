@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+	"github.com/northerntrickle/backend/httputil"
 )
 
 type database struct {
@@ -142,6 +146,67 @@ func (h *hub) run() {
 }
 
 var (
+	errNotFound = &httputil.HTTPError{http.StatusNotFound,
+		errors.New("not found")}
+)
+
+type handler func(w http.ResponseWriter, r *http.Request) error
+
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rv := recover(); rv != nil {
+			err := errors.New("handler panic")
+			logError(r, err, rv)
+			handleAPIError(w, r, http.StatusInternalServerError, err, false)
+		}
+	}()
+	var rb httputil.ResponseBuffer
+	err := h(&rb, r)
+	if err == nil {
+		rb.WriteTo(w)
+	} else if e, ok := err.(*httputil.HTTPError); ok {
+		if e.Status >= 500 {
+			logError(r, err, nil)
+		}
+		handleAPIError(w, r, e.Status, e.Err, true)
+	} else {
+		logError(r, err, nil)
+		handleAPIError(w, r, http.StatusInternalServerError, err, false)
+	}
+}
+
+func logError(req *http.Request, err error, rv interface{}) {
+	if err != nil {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "Error serving %s: %v\n", req.URL, err)
+		if rv != nil {
+			fmt.Fprintln(&buf, rv)
+			buf.Write(debug.Stack())
+		}
+		log.Println(buf.String())
+	}
+}
+
+func handleAPIError(resp http.ResponseWriter, req *http.Request,
+	status int, err error, showErrorMsg bool) {
+	var data struct {
+		Error struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	data.Error.Status = status
+	if showErrorMsg {
+		data.Error.Message = err.Error()
+	} else {
+		data.Error.Message = http.StatusText(status)
+	}
+	resp.Header().Set("Content-Type", "application/json; charset=utf-8")
+	resp.WriteHeader(status)
+	json.NewEncoder(resp).Encode(&data)
+}
+
+var (
 	h = &hub{
 		conns:      make(map[*conn]bool),
 		broadcast:  make(chan []byte),
@@ -170,42 +235,43 @@ func main() {
 		port = "3000"
 	}
 
-	http.HandleFunc("/sign_up", createUser)
-	http.HandleFunc("/login", createJWT)
-	http.HandleFunc("/connect", serveWs)
+	http.Handle("/sign_up", handler(createUser))
+	http.Handle("/login", handler(createJWT))
+	http.Handle("/connect", handler(serveWs))
 	log.Fatal(http.ListenAndServe(":"+port, httpLog(http.DefaultServeMux)))
 }
 
 // TODO: Return error if username is already taken instead of just overwriting
 // the user
-func createUser(w http.ResponseWriter, r *http.Request) {
+func createUser(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	username, password, err := decodeUsernameAndPassword(r.Body)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	user := CreateUser(username, password)
 	if err := json.NewEncoder(w).Encode(&user); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
-func createJWT(w http.ResponseWriter, r *http.Request) {
+func createJWT(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	username, password, err := decodeUsernameAndPassword(r.Body)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	user, err := db.getUserByUsername(username)
 	if err != nil {
-		panic(err)
+		return errNotFound
 	}
 
 	if user.Password != password {
-		w.Write([]byte("password does not match"))
-		return
+		return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
+			errors.New("password does not match")}
 	}
 
 	jwt := NewJWT(user.ID)
@@ -214,8 +280,9 @@ func createJWT(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.Token = jwt.String()
 	if err := json.NewEncoder(w).Encode(&resp); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func decodeUsernameAndPassword(r io.Reader) (username, password string,
@@ -231,14 +298,15 @@ func decodeUsernameAndPassword(r io.Reader) (username, password string,
 	return req.Username, req.Password, nil
 }
 
-func serveWs(w http.ResponseWriter, r *http.Request) {
+func serveWs(w http.ResponseWriter, r *http.Request) error {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	c := &conn{send: make(chan []byte, 256), ws: ws}
 	h.register <- c
 	c.writePump()
+
+	return nil
 }
