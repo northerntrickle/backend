@@ -83,8 +83,9 @@ const (
 )
 
 type conn struct {
-	ws   *websocket.Conn
-	send chan []byte
+	ws     *websocket.Conn
+	send   chan []byte
+	userID string
 }
 
 func (c *conn) write(mt int, payload []byte) error {
@@ -308,6 +309,9 @@ func serveWs(w http.ResponseWriter, r *http.Request) error {
 	token, err := jwt.Parse(tok, func(token *jwt.Token) (interface{}, error) {
 		return []byte("foobar"), nil
 	})
+	if err != nil {
+		return err
+	}
 
 	if !token.Valid {
 		fmt.Println(tok)
@@ -315,7 +319,8 @@ func serveWs(w http.ResponseWriter, r *http.Request) error {
 			errors.New("bad authentication")}
 	}
 
-	if _, ok := db.users[token.Claims["id"].(string)]; !ok {
+	user, ok := db.users[token.Claims["id"].(string)]
+	if !ok {
 		return &httputil.HTTPError{http.StatusNotFound,
 			errors.New("user for token does not exist")}
 	}
@@ -325,7 +330,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	c := &conn{send: make(chan []byte, 256), ws: ws}
+	c := &conn{send: make(chan []byte, 256), ws: ws, userID: user.ID}
 	h.register <- c
 	c.writePump()
 
