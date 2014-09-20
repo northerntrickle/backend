@@ -236,6 +236,9 @@ func main() {
 		port = "3000"
 	}
 
+	http.Handle("/", handler(serveRoot))
+	http.Handle("/static/",
+		http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	http.Handle("/sign_up", handler(createUser))
 	http.Handle("/login", handler(createJWT))
 	http.Handle("/connect", handler(serveWs))
@@ -246,6 +249,15 @@ func renderJSON(w http.ResponseWriter, v interface{}, status int) error {
 	w.WriteHeader(status)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	return json.NewEncoder(w).Encode(&v)
+}
+
+func serveRoot(w http.ResponseWriter, r *http.Request) error {
+	file, err := os.Open("./index.html")
+	if err != nil {
+		return err
+	}
+	io.Copy(w, file)
+	return nil
 }
 
 // TODO: Return error if username is already taken instead of just overwriting
