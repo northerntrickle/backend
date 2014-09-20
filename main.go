@@ -299,6 +299,27 @@ func decodeUsernameAndPassword(r io.Reader) (username, password string,
 }
 
 func serveWs(w http.ResponseWriter, r *http.Request) error {
+	tok := r.URL.Query().Get("auth")
+	if tok == "" {
+		return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
+			errors.New("auth param is required")}
+	}
+
+	token, err := jwt.Parse(tok, func(token *jwt.Token) (interface{}, error) {
+		return []byte("foobar"), nil
+	})
+
+	if !token.Valid {
+		fmt.Println(tok)
+		return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
+			errors.New("bad authentication")}
+	}
+
+	if _, ok := db.users[token.Claims["id"].(string)]; !ok {
+		return &httputil.HTTPError{http.StatusNotFound,
+			errors.New("user for token does not exist")}
+	}
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return err
