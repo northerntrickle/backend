@@ -241,6 +241,12 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, httpLog(http.DefaultServeMux)))
 }
 
+func renderJSON(w http.ResponseWriter, v interface{}, status int) error {
+	w.WriteHeader(status)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	return json.NewEncoder(w).Encode(&v)
+}
+
 // TODO: Return error if username is already taken instead of just overwriting
 // the user
 func createUser(w http.ResponseWriter, r *http.Request) error {
@@ -251,10 +257,7 @@ func createUser(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	user := CreateUser(username, password)
-	if err := json.NewEncoder(w).Encode(&user); err != nil {
-		return err
-	}
-	return nil
+	return renderJSON(w, user, http.StatusCreated)
 }
 
 func createJWT(w http.ResponseWriter, r *http.Request) error {
@@ -279,10 +282,7 @@ func createJWT(w http.ResponseWriter, r *http.Request) error {
 		Token string `json:"token"`
 	}
 	resp.Token = jwt.String()
-	if err := json.NewEncoder(w).Encode(&resp); err != nil {
-		return err
-	}
-	return nil
+	return renderJSON(w, resp, http.StatusCreated)
 }
 
 func decodeUsernameAndPassword(r io.Reader) (username, password string,
