@@ -21,10 +21,60 @@ import (
 	"github.com/northerntrickle/backend/httputil"
 )
 
+type userAttributes struct {
+	Health int `json:"health"` // can be from 0-6. each decrement is a hit.
+}
+
+type position struct {
+	Direction direction `json:"direction"`
+	X         float64   `json:"x"`
+	Y         float64   `json:"y"`
+}
+
+type User struct {
+	ID         string         `json:"id"`
+	Username   string         `json:"username"`
+	Password   string         `json:"-"`
+	Attributes userAttributes `json:"attributes"`
+	Position   position       `json:"position"`
+}
+
+func NewUser(username, password string) *User {
+	user := &User{
+		ID:       uuid.NewUUID().String(),
+		Username: username,
+		Password: password,
+		Attributes: userAttributes{
+			Health: 6,
+		},
+	}
+	db.Users[user.ID] = user
+	return user
+}
+
+type Guild struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	OwnerID   string   `json:"owner_id"`
+	MemberIDs []string `json:"member_ids"`
+}
+
+func NewGuild(name, ownerID string) *Guild {
+	guild := &Guild{
+		ID:        uuid.NewUUID().String(),
+		Name:      name,
+		OwnerID:   ownerID,
+		MemberIDs: make([]string, 0),
+	}
+	db.Guilds[guild.ID] = guild
+	return guild
+}
+
 const dbname = "db.json"
 
 type database struct {
-	Users map[string]*User
+	Users  map[string]*User
+	Guilds map[string]*Guild
 }
 
 func (d *database) saveOnInterval(interval time.Duration) {
@@ -59,49 +109,23 @@ func (d *database) getUserByUsername(username string) (u *User, err error) {
 
 func NewDatabase() *database {
 	return &database{
-		Users: make(map[string]*User),
+		Users:  make(map[string]*User),
+		Guilds: make(map[string]*Guild),
 	}
 }
 
 var db = NewDatabase()
 
-type userAttributes struct {
-	Health int `json:"health"` // can be from 0-6. each decrement is a hit.
-}
-
-type position struct {
-	Direction direction `json:"direction"`
-	X         float64   `json:"x"`
-	Y         float64   `json:"y"`
-}
-
-type User struct {
-	ID         string         `json:"id"`
-	Username   string         `json:"username"`
-	Password   string         `json:"-"`
-	Attributes userAttributes `json:"attributes"`
-	Position   position       `json:"position"`
-}
-
-func NewUser(username, password string) *User {
-	user := &User{
-		ID:       uuid.NewUUID().String(),
-		Username: username,
-		Password: password,
-		Attributes: userAttributes{
-			Health: 6,
-		},
-	}
-	db.Users[user.ID] = user
-	return user
-}
-
 type JWT struct {
-	tok *jwt.Token
+	Tok *jwt.Token
+}
+
+func (t *JWT) Valid() bool {
+	return t.Tok.Valid
 }
 
 func (t *JWT) String() string {
-	str, err := t.tok.SignedString([]byte("foobar"))
+	str, err := t.Tok.SignedString([]byte("foobar"))
 	if err != nil {
 		panic(err)
 	}
@@ -113,6 +137,16 @@ func NewJWT(userID string) *JWT {
 	tok.Claims["id"] = userID
 	tok.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	return &JWT{tok}
+}
+
+func NewJWTFromSignedString(signed string) (*JWT, error) {
+	token, err := jwt.Parse(signed, func(token *jwt.Token) (interface{}, error) {
+		return []byte("foobar"), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &JWT{token}, nil
 }
 
 type eventType int
@@ -505,28 +539,26 @@ func decodeUsernameAndPassword(r io.Reader) (username, password string,
 }
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
-	tok := r.URL.Query().Get("auth")
-	if tok == "" {
+	tokStr := r.URL.Query().Get("auth")
+	if tokStr == "" {
 		log.Println(&httputil.HTTPError{httputil.StatusUnprocessableEntity,
 			errors.New("auth param is required")})
 		return
 	}
 
-	token, err := jwt.Parse(tok, func(token *jwt.Token) (interface{}, error) {
-		return []byte("foobar"), nil
-	})
+	tok, err := NewJWTFromSignedString(tokStr)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	if !token.Valid {
+	if !tok.Valid() {
 		log.Println(&httputil.HTTPError{httputil.StatusUnprocessableEntity,
 			errors.New("bad authentication")})
 		return
 	}
 
-	user, ok := db.Users[token.Claims["id"].(string)]
+	user, ok := db.Users[tok.Tok.Claims["id"].(string)]
 	if !ok {
 		log.Println(&httputil.HTTPError{http.StatusNotFound,
 			errors.New("user for token does not exist")})
