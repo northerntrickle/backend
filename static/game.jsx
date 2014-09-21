@@ -108,7 +108,17 @@ var Player = (function PlayerClosure(){
     var options = options || {};
     this.health = 100;
     this.inventory = [];
-    this.sprite = game.add.tileSprite(options.x || 0, options.y || 0, 13, 16, 'tilesBoys');
+    this.sprite = game.add.tileSprite(options.x || window.screen.width/2, options.y || window.screen.height/2, 13, 16, 'tilesBoys');
+    //this.sprite.animations.add('ani', [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], 1, true);
+    this.sprite.animations.add('N', [4]);
+    this.sprite.animations.add('E', [0]);
+    this.sprite.animations.add('S', [6]);
+    this.sprite.animations.add('W', [2]);
+
+    this.sprite.animations.add('AE', [1]);
+    this.sprite.animations.add('AW', [3]);
+    this.sprite.animations.add('AN', [5]);
+    this.sprite.animations.add('AS', [7]);
 
     if(ENABLE_PHYSICS){
       game.physics.p2.enable(this.sprite);
@@ -173,10 +183,22 @@ var InputActor = (function InputActorClosure(){
         body: { direction: direction }
       }));
       switch(direction){
-        case NORTH: this.player.sprite.y -= 5; break;
-        case EAST: this.player.sprite.x += 5; break;
-        case SOUTH: this.player.sprite.y += 5; break;
-        case WEST: this.player.sprite.x -= 5; break;
+        case NORTH: 
+          this.player.sprite.y -= 1; 
+          this.player.sprite.animations.play('N', 20, true);
+          break;
+        case EAST: 
+          this.player.sprite.x += 1; 
+          this.player.sprite.animations.play('E', 20, true);
+          break;
+        case SOUTH: 
+          this.player.sprite.y += 1; 
+          this.player.sprite.animations.play('S', 20, true);
+          break;
+        case WEST: 
+          this.player.sprite.x -= 1; 
+          this.player.sprite.animations.play('W', 20, true);
+          break;
       }
       this.facing = direction;
     },
@@ -185,6 +207,20 @@ var InputActor = (function InputActorClosure(){
       this.net.send(JSON.stringify({
         type: EVENT_PLAYER_ATTACK,
       }));
+      switch(this.facing){
+        case NORTH: 
+          this.player.sprite.animations.play('AN', 20, true);
+          break;
+        case EAST: 
+          this.player.sprite.animations.play('AE', 20, true);
+          break;
+        case SOUTH: 
+          this.player.sprite.animations.play('AS', 20, true);
+          break;
+        case WEST: 
+          this.player.sprite.animations.play('AW', 20, true);
+          break;
+      }
     }
   }
 
@@ -218,10 +254,17 @@ var Game = (function GameClosure(){
       this.userId = userId;
       this.net.initialize();
       this.players = {};
-      this.game = new Phaser.Game(window.screen.width - 400, window.screen.height, Phaser.CANVAS, 'trickle', {
+      this.game = new Phaser.Game(200, 150, Phaser.CANVAS, 'trickle', {
         preload: this.preload(this),
         create: this.create(this),
-        update: this.update(this) })
+        update: this.update(this),
+        render: this.render(this)}, false, false)
+    },
+
+    render: function Game_render(that){
+      return function(){
+        that.context.drawImage(this.game.canvas, 0, 0, this.game.width, this.game.height, 0, 0, that.width, that.height);
+      }
     },
 
     preload: function Game_preload(that){
@@ -233,7 +276,7 @@ var Game = (function GameClosure(){
         this.game.load.image('tilesFlags', 'static/assets/Assets/flags.png');
         this.game.load.image('tilesBuildings', 'static/assets/Assets/building.png');
         this.game.load.image('tilesGirls', 'static/assets/Assets/girl.png');
-        this.game.load.image('tilesBoys', 'static/assets/Assets/boy.png');
+        this.game.load.spritesheet('tilesBoys', 'static/assets/Assets/boy.png', 16, 16);
         this.game.load.image('tilesFurniture', 'static/assets/Assets/furniture.png');
         this.game.load.image('tilesTims', 'static/assets/Assets/tim.png');
       }
@@ -242,6 +285,27 @@ var Game = (function GameClosure(){
     create: function Game_create(that){
       return function(){
         //that.game.add.image(0, 0, 'sky');
+        //,phaser/build/
+        that.game.canvas.style['display'] = 'none';
+
+        that.canvas = Phaser.Canvas.create(that.game.width * 4, that.game.height * 4);
+
+        //  Store a reference to the Canvas Context
+        that.context = that.canvas.getContext('2d');
+
+        //  Add the scaled canvas to the DOM
+        Phaser.Canvas.addToDOM(that.canvas);
+
+        //  Disable smoothing on the scaled canvas
+        Phaser.Canvas.setSmoothingEnabled(that.context, false);
+
+        //  Cache the width/height to avoid looking it up every render
+        that.width = that.canvas.width;
+        that.height = that.canvas.height;
+
+        that.game.stage.smooth = false;
+        that.game.world.setBounds(-200, -150, 400, 300);
+        //that.game.world.scale.setTo(2, 2);
         var map = that.game.add.tilemap('hortons');
         map.addTilesetImage('Grass', 'tilesGrass');
         map.addTilesetImage('Road', 'tilesRoad');
@@ -265,13 +329,18 @@ var Game = (function GameClosure(){
         layerPeople.wrap = true;
 
         that.players[that.userId] = new Player(that.game);
+
+
+        that.game.camera.follow(that.players[that.userId].sprite, Phaser.Camera.FOLLOW_TOPDOWN);
+
+
         that.input = new InputActor(that.net, that.players[that.userId] )
 
         //that.players[that.userId].name = index.toString();
-        that.game.physics.enable(that.players[that.userId].sprite, Phaser.Physics.ARCADE);
-        that.players[that.userId].sprite.body.immovable = false;
+       //#that.game.physics.enable(that.players[that.userId].sprite, Phaser.Physics.ARCADE);
+        //hat.players[that.userId].sprite.body.immovable = false;
         //that.players[that.userId].sprite.body.collideWorldBounds = true;
-        that.players[that.userId].sprite.body.bounce.setTo(1, 1);
+        //that.players[that.userId].sprite.body.bounce.setTo(1, 1);
 
         that.net.on(EVENT_PLAYER_MOVE, function(data){
           if(that.players[data.user_id]){
@@ -330,7 +399,6 @@ var Game = (function GameClosure(){
         } else if (cursors.down.isDown) {
             that.input.move(SOUTH);
         }
-
         
       }
     },
@@ -403,8 +471,8 @@ var Login = React.createClass({
     if(!this.loggedIn){
       return (
         <form action="">
-          <input type="text" onChange={this.handleChangeLogin} value={this.state.login}/>
-          <input type="password" onChange={this.handleChangePass} value={this.state.pass}/>
+          <input type="text" onChange={this.handleChangeLogin} value={this.state.login} placeholder="Login"/>
+          <input type="password" onChange={this.handleChangePass} value={this.state.pass} placeholder="Password"/>
           <button type="button" onClick={this.handleLogin}>Login</button>
         </form>
       )
