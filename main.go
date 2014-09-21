@@ -22,6 +22,8 @@ import (
 
 const (
 	tileWidth = 16
+	mapHeight = 100
+	mapWidth  = 100
 )
 
 type userAttributes struct {
@@ -278,13 +280,31 @@ func (c *conn) readPump() {
 			inc := 5.0
 			switch body.Direction {
 			case north:
-				user.Position.Dimensions.Y -= inc
+				if user.Position.Dimensions.Y > 0 {
+					user.Position.Dimensions.Y -= inc
+				} else {
+					user.Position.Dimensions.Y += inc
+				}
 			case east:
-				user.Position.Dimensions.X += inc
+				if user.Position.Dimensions.X > 0 {
+					user.Position.Dimensions.X += inc
+				} else {
+					user.Position.Dimensions.X -= inc
+				}
 			case south:
-				user.Position.Dimensions.Y += inc
+				if user.Position.Dimensions.Y+user.Position.Dimensions.Height <
+					mapHeight*tileWidth {
+					user.Position.Dimensions.Y += inc
+				} else {
+					user.Position.Dimensions.Y -= inc
+				}
 			case west:
-				user.Position.Dimensions.X -= inc
+				if user.Position.Dimensions.X+user.Position.Dimensions.Width <
+					mapWidth*tileWidth {
+					user.Position.Dimensions.X -= inc
+				} else {
+					user.Position.Dimensions.X += inc
+				}
 			}
 
 			event.Body = user.Position
