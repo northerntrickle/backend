@@ -65,17 +65,35 @@ func NewDatabase() *database {
 
 var db = NewDatabase()
 
-type User struct {
-	ID       string   `json:"id"`
-	Username string   `json:"username"`
-	Password string   `json:"-"`
-	Position position `json:"position"`
+type userAttributes struct {
+	Health int `json:"health"` // can be from 0-6. each decrement is a hit.
 }
 
 type position struct {
 	Direction direction `json:"direction"`
 	X         float64   `json:"x"`
 	Y         float64   `json:"y"`
+}
+
+type User struct {
+	ID         string         `json:"id"`
+	Username   string         `json:"username"`
+	Password   string         `json:"-"`
+	Attributes userAttributes `json:"attributes"`
+	Position   position       `json:"position"`
+}
+
+func NewUser(username, password string) *User {
+	user := &User{
+		ID:       uuid.NewUUID().String(),
+		Username: username,
+		Password: password,
+		Attributes: userAttributes{
+			Health: 6,
+		},
+	}
+	db.Users[user.ID] = user
+	return user
 }
 
 type JWT struct {
@@ -95,16 +113,6 @@ func NewJWT(userID string) *JWT {
 	tok.Claims["id"] = userID
 	tok.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	return &JWT{tok}
-}
-
-func CreateUser(username, password string) *User {
-	user := &User{
-		ID:       uuid.NewUUID().String(),
-		Username: username,
-		Password: password,
-	}
-	db.Users[user.ID] = user
-	return user
 }
 
 type eventType int
@@ -452,7 +460,7 @@ func createUser(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	user := CreateUser(username, password)
+	user := NewUser(username, password)
 	return renderJSON(w, user, http.StatusCreated)
 }
 
