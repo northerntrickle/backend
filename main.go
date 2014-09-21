@@ -274,7 +274,7 @@ func (c *conn) readPump() {
 		if err != nil {
 			break
 		}
-		fmt.Println(string(b))
+
 		h.broadcast <- b
 	}
 }
@@ -496,7 +496,7 @@ func createUser(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	user := NewUser(username, password)
+	user := *NewUser(username, password)
 	user.Password = ""
 	return renderJSON(w, user, http.StatusCreated)
 }
