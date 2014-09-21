@@ -182,6 +182,7 @@ type eventType int
 const (
 	playerMove eventType = iota
 	playerAttack
+	playerDamage
 	chat
 )
 
@@ -275,13 +276,12 @@ func (c *conn) readPump() {
 
 		evt.UserID = c.userID
 
-		user := db.Users[c.userID]
-
 		switch evt.Type {
 		case playerMove:
+			user := db.Users[c.userID]
 			body := evt.Body.(moveEvent)
 
-			inc := 5.0
+			inc := 1.0
 			switch body.Direction {
 			case north:
 				if user.Position.Dimensions.Y >= 0 {
@@ -320,10 +320,31 @@ func (c *conn) readPump() {
 
 			h.broadcast <- b
 		case playerAttack:
+			userPtr := db.Users[c.userID]
+			user := *userPtr
 			for _, v := range db.Users {
 				if user.Username != v.Username &&
 					user.Position.Dimensions.Intersects(&v.Position.Dimensions) {
+
+					userPtr.Attributes.Health--
+					user := *userPtr
+					if user.Attributes.Health == 0 {
+						delete(db.Users, user.ID)
+					}
+
 					e := event{
+						Type:   playerDamage,
+						UserID: user.ID,
+						Body:   user.Attributes,
+					}
+					b, err := json.Marshal(&e)
+					if err != nil {
+						break
+					}
+
+					h.broadcast <- b
+
+					e = event{
 						Type:   chat,
 						UserID: user.ID,
 						Body: chatEvent{
@@ -331,7 +352,7 @@ func (c *conn) readPump() {
 								v.Username),
 						},
 					}
-					b, err := json.Marshal(&e)
+					b, err = json.Marshal(&e)
 					if err != nil {
 						break
 					}
