@@ -14,11 +14,14 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
-
 	"github.com/codegangsta/negroni"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 	"github.com/northerntrickle/backend/httputil"
+)
+
+const (
+	tileWidth = 16
 )
 
 type userAttributes struct {
@@ -26,9 +29,22 @@ type userAttributes struct {
 }
 
 type position struct {
-	Direction direction `json:"direction"`
-	X         float64   `json:"x"`
-	Y         float64   `json:"y"`
+	Direction  direction `json:"direction"`
+	Dimensions rect      `json:"dimensions"`
+}
+
+type rect struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+}
+
+func (r *rect) Intersects(o *rect) bool {
+	if (r.X+r.Width < o.X || r.X > o.X+o.Width) && (r.Y+r.Height < o.Y || r.Y+r.Height > o.Y) {
+		return false
+	}
+	return true
 }
 
 type User struct {
@@ -46,6 +62,12 @@ func NewUser(username, password string) *User {
 		Password: password,
 		Attributes: userAttributes{
 			Health: 6,
+		},
+		Position: position{
+			Dimensions: rect{
+				Width:  tileWidth,
+				Height: tileWidth * 2,
+			},
 		},
 	}
 	db.Users[user.ID] = user
@@ -183,7 +205,7 @@ func (e *event) UnmarshalJSON(data []byte) error {
 		}
 		e.Body = wrapper.Body
 	case playerAttack:
-		fmt.Println("NOT IMPLEMENTED")
+		e.Body = nil
 	case chat:
 		var wrapper struct {
 			Body chatEvent `json:"body"`
@@ -247,35 +269,53 @@ func (c *conn) readPump() {
 
 		event.UserID = c.userID
 
+		user := db.Users[c.userID]
+
 		switch event.Type {
 		case playerMove:
 			body := event.Body.(moveEvent)
-			user := db.Users[c.userID]
 
 			inc := 5.0
 			switch body.Direction {
 			case north:
-				user.Position.Y -= inc
+				user.Position.Dimensions.Y -= inc
 			case east:
-				user.Position.X += inc
+				user.Position.Dimensions.X += inc
 			case south:
-				user.Position.Y += inc
+				user.Position.Dimensions.Y += inc
 			case west:
-				user.Position.X -= inc
+				user.Position.Dimensions.X -= inc
 			}
 
 			event.Body = user.Position
+
+			b, err := json.Marshal(&event)
+			if err != nil {
+				break
+			}
+
+			h.broadcast <- b
 		case playerAttack:
-			fmt.Println("Player attack!")
+			for _, v := range db.Users {
+				if user.Position.Dimensions.Intersects(&v.Position.Dimensions) {
+					fmt.Println("Player hit!")
+					//b, err := json.Marshal(&event)
+					//if err != nil {
+					//break
+					//}
+
+					//h.broadcast <- b
+				}
+			}
+
 		case chat:
-		}
+			b, err := json.Marshal(&event)
+			if err != nil {
+				break
+			}
 
-		b, err := json.Marshal(&event)
-		if err != nil {
-			break
+			h.broadcast <- b
 		}
-
-		h.broadcast <- b
 	}
 }
 
