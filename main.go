@@ -546,6 +546,8 @@ func main() {
 	r.Handle("/sign_up", handler(createUser)).Methods("POST")
 	r.Handle("/login", handler(createJWT)).Methods("POST")
 
+	r.HandleFunc("/game_state", gameState).Methods("GET")
+
 	r.HandleFunc("/connect", serveWs).Methods("GET")
 
 	n.Use(negroni.HandlerFunc(func(w http.ResponseWriter, r *http.Request,
@@ -636,6 +638,24 @@ func decodeUsernameAndPassword(r io.Reader) (username, password string,
 	}
 
 	return req.Username, req.Password, nil
+}
+
+func gameState(w http.ResponseWriter, r *http.Request) {
+	state := make(map[string]interface{})
+	state["users"] = make([]*User, 0)
+	state["guilds"] = make([]*Guild, 0)
+
+	for _, v := range db.Users {
+		u := *v
+		u.Password = ""
+		state["users"] = append(state["users"].([]*User), &u)
+	}
+
+	for _, v := range db.Guilds {
+		state["guilds"] = append(state["guilds"].([]*Guild), v)
+	}
+
+	renderJSON(w, state, http.StatusOK)
 }
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
