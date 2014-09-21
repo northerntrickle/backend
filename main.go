@@ -14,6 +14,7 @@ import (
 
 	"code.google.com/p/go-uuid/uuid"
 
+	"github.com/codegangsta/negroni"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 	"github.com/northerntrickle/backend/httputil"
@@ -218,17 +219,11 @@ var (
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
 	}
 )
-
-func httpLog(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
-		handler.ServeHTTP(w, r)
-		log.Printf("Completed in %s", time.Now().Sub(start).String())
-	})
-}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -236,13 +231,29 @@ func main() {
 		port = "3000"
 	}
 
+	go h.run()
+
+	n := negroni.New()
+
 	http.Handle("/", handler(serveRoot))
 	http.Handle("/static/",
 		http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	http.Handle("/sign_up", handler(createUser))
 	http.Handle("/login", handler(createJWT))
-	http.Handle("/connect", handler(serveWs))
-	log.Fatal(http.ListenAndServe(":"+port, httpLog(http.DefaultServeMux)))
+	http.HandleFunc("/connect", serveWs)
+
+	n.Use(negroni.HandlerFunc(func(w http.ResponseWriter, r *http.Request,
+		next http.HandlerFunc) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			return
+		}
+		next(w, r)
+	}))
+
+	n.UseHandler(http.DefaultServeMux)
+	n.Run(":" + port)
 }
 
 func renderJSON(w http.ResponseWriter, v interface{}, status int) error {
@@ -311,40 +322,42 @@ func decodeUsernameAndPassword(r io.Reader) (username, password string,
 	return req.Username, req.Password, nil
 }
 
-func serveWs(w http.ResponseWriter, r *http.Request) error {
+func serveWs(w http.ResponseWriter, r *http.Request) {
 	tok := r.URL.Query().Get("auth")
 	if tok == "" {
-		return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
-			errors.New("auth param is required")}
+		log.Println(&httputil.HTTPError{httputil.StatusUnprocessableEntity,
+			errors.New("auth param is required")})
+		return
 	}
 
 	token, err := jwt.Parse(tok, func(token *jwt.Token) (interface{}, error) {
 		return []byte("foobar"), nil
 	})
 	if err != nil {
-		return err
+		log.Println(err)
+		return
 	}
 
 	if !token.Valid {
-		fmt.Println(tok)
-		return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
-			errors.New("bad authentication")}
+		log.Println(&httputil.HTTPError{httputil.StatusUnprocessableEntity,
+			errors.New("bad authentication")})
+		return
 	}
 
 	user, ok := db.users[token.Claims["id"].(string)]
 	if !ok {
-		return &httputil.HTTPError{http.StatusNotFound,
-			errors.New("user for token does not exist")}
+		log.Println(&httputil.HTTPError{http.StatusNotFound,
+			errors.New("user for token does not exist")})
+		return
 	}
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		return err
+		log.Println(err)
+		return
 	}
 
 	c := &conn{send: make(chan []byte, 256), ws: ws, userID: user.ID}
 	h.register <- c
 	c.writePump()
-
-	return nil
 }
