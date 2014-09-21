@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -20,12 +21,35 @@ import (
 	"github.com/northerntrickle/backend/httputil"
 )
 
+const dbname = "db.json"
+
 type database struct {
-	users map[string]*User
+	Users map[string]*User
+}
+
+func (d *database) saveOnInterval(interval time.Duration) {
+	t := time.NewTicker(interval)
+
+	for {
+		select {
+		case <-t.C:
+			// TODO: Stream this to the file
+			b, err := json.Marshal(&d)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+
+			if err := ioutil.WriteFile(dbname, b, 0644); err != nil {
+				log.Println(err)
+				break
+			}
+		}
+	}
 }
 
 func (d *database) getUserByUsername(username string) (u *User, err error) {
-	for _, v := range d.users {
+	for _, v := range d.Users {
 		if v.Username == username {
 			return v, nil
 		}
@@ -35,7 +59,7 @@ func (d *database) getUserByUsername(username string) (u *User, err error) {
 
 func NewDatabase() *database {
 	return &database{
-		users: make(map[string]*User),
+		Users: make(map[string]*User),
 	}
 }
 
@@ -79,7 +103,7 @@ func CreateUser(username, password string) *User {
 		Username: username,
 		Password: password,
 	}
-	db.users[user.ID] = user
+	db.Users[user.ID] = user
 	return user
 }
 
@@ -177,7 +201,7 @@ func (c *conn) readPump() {
 		switch event.Type {
 		case playerMove:
 			body := event.Body.(moveEventInput)
-			user := db.users[c.userID]
+			user := db.Users[c.userID]
 
 			inc := 5.0
 			switch body.Direction {
@@ -341,13 +365,30 @@ var (
 	}
 )
 
+func loadDBFromFile(filename string) error {
+	file, err := os.Open(dbname)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	} else if err == nil {
+		if err := json.NewDecoder(file).Decode(&db); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func main() {
+	if err := loadDBFromFile(dbname); err != nil {
+		log.Fatal(err)
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
 	go h.run()
+	go db.saveOnInterval(time.Second * 5)
 
 	n := negroni.New()
 
@@ -419,8 +460,10 @@ func createJWT(w http.ResponseWriter, r *http.Request) error {
 
 	jwt := NewJWT(user.ID)
 	var resp struct {
-		Token string `json:"token"`
+		UserID string `json:"user_id"`
+		Token  string `json:"token"`
 	}
+	resp.UserID = user.ID
 	resp.Token = jwt.String()
 	return renderJSON(w, resp, http.StatusCreated)
 }
@@ -460,7 +503,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := db.users[token.Claims["id"].(string)]
+	user, ok := db.Users[token.Claims["id"].(string)]
 	if !ok {
 		log.Println(&httputil.HTTPError{http.StatusNotFound,
 			errors.New("user for token does not exist")})
