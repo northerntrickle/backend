@@ -42,9 +42,16 @@ func NewDatabase() *database {
 var db = NewDatabase()
 
 type User struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"-"`
+	ID       string   `json:"id"`
+	Username string   `json:"username"`
+	Password string   `json:"-"`
+	Position position `json:"position"`
+}
+
+type position struct {
+	Direction direction `json:"direction"`
+	X         float64   `json:"x"`
+	Y         float64   `json:"y"`
 }
 
 type JWT struct {
@@ -76,6 +83,64 @@ func CreateUser(username, password string) *User {
 	return user
 }
 
+type eventType int
+
+const (
+	playerMove eventType = iota
+	playerAttack
+)
+
+type event struct {
+	Type   eventType   `json:"type"`
+	UserID string      `json:"user_id"`
+	Body   interface{} `json:"body"`
+}
+
+func (e *event) UnmarshalJSON(data []byte) error {
+	var typeWrapper struct {
+		Type eventType `json:"type"`
+	}
+	if err := json.Unmarshal(data, &typeWrapper); err != nil {
+		return err
+	}
+
+	e.Type = typeWrapper.Type
+
+	switch e.Type {
+	case playerMove:
+		var wrapper struct {
+			Body moveEventInput `json:"body"`
+		}
+		if err := json.Unmarshal(data, &wrapper); err != nil {
+			return err
+		}
+		e.Body = wrapper.Body
+	case playerAttack:
+		fmt.Println("NOT IMPLEMENTED")
+	}
+
+	return nil
+}
+
+type direction int
+
+const (
+	north direction = iota
+	east
+	south
+	west
+)
+
+type moveEventInput struct {
+	Direction direction `json:"direction"`
+}
+
+type moveEventOutput struct {
+	Direction direction `json:"direction"`
+	X         float64   `json:"x"`
+	Y         float64   `json:"y"`
+}
+
 const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
@@ -87,6 +152,57 @@ type conn struct {
 	ws     *websocket.Conn
 	send   chan []byte
 	userID string
+}
+
+func (c *conn) readPump() {
+	defer func() {
+		h.unregister <- c
+		c.ws.Close()
+	}()
+	c.ws.SetReadLimit(maxMessageSize)
+	c.ws.SetReadDeadline(time.Now().Add(pongWait))
+	c.ws.SetPongHandler(func(string) error {
+		c.ws.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	for {
+		var event event
+		err := c.ws.ReadJSON(&event)
+		if err != nil {
+			break
+		}
+
+		event.UserID = c.userID
+
+		switch event.Type {
+		case playerMove:
+			body := event.Body.(moveEventInput)
+			user := db.users[c.userID]
+
+			inc := 5.0
+			switch body.Direction {
+			case north:
+				user.Position.Y -= inc
+			case east:
+				user.Position.X += inc
+			case south:
+				user.Position.Y += inc
+			case west:
+				user.Position.X -= inc
+			}
+
+			event.Body = user.Position
+		case playerAttack:
+			fmt.Println("Player attack!")
+		}
+
+		b, err := json.Marshal(&event)
+		if err != nil {
+			break
+		}
+		fmt.Println(string(b))
+		h.broadcast <- b
+	}
 }
 
 func (c *conn) write(mt int, payload []byte) error {
@@ -359,5 +475,6 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 
 	c := &conn{send: make(chan []byte, 256), ws: ws, userID: user.ID}
 	h.register <- c
-	c.writePump()
+	go c.writePump()
+	c.readPump()
 }
