@@ -281,13 +281,14 @@ func (c *conn) readPump() {
 			inc := 5.0
 			switch body.Direction {
 			case north:
-				if user.Position.Dimensions.Y > 0 {
+				if user.Position.Dimensions.Y >= 0 {
 					user.Position.Dimensions.Y -= inc
 				} else {
 					user.Position.Dimensions.Y += inc
 				}
 			case east:
-				if user.Position.Dimensions.X > 0 {
+				if user.Position.Dimensions.X+user.Position.Dimensions.Width <
+					mapHeight*tileWidth {
 					user.Position.Dimensions.X += inc
 				} else {
 					user.Position.Dimensions.X -= inc
@@ -300,8 +301,7 @@ func (c *conn) readPump() {
 					user.Position.Dimensions.Y -= inc
 				}
 			case west:
-				if user.Position.Dimensions.X+user.Position.Dimensions.Width <
-					mapWidth*tileWidth {
+				if user.Position.Dimensions.X > 0 {
 					user.Position.Dimensions.X -= inc
 				} else {
 					user.Position.Dimensions.X += inc
