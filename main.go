@@ -100,6 +100,7 @@ func NewGuild(name, ownerID string) *Guild {
 
 const dbname = "db.json"
 
+// because databases are hard
 type database struct {
 	Users  map[string]*User
 	Guilds map[string]*Guild
