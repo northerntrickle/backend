@@ -19,6 +19,82 @@ import (
   "github.com/northerntrickle/backend/httputil"
 )
 
+const (
+  tileWidth = 16
+  mapHeight = 100
+  mapWidth  = 100
+)
+
+type userAttributes struct {
+  Health int `json:"health"` // can be from 0-6. each decrement is a hit.
+}
+
+type position struct {
+  Direction  direction `json:"direction"`
+  Dimensions rect      `json:"dimensions"`
+}
+
+type rect struct {
+  X      float64 `json:"x"`
+  Y      float64 `json:"y"`
+  Width  float64 `json:"width"`
+  Height float64 `json:"height"`
+}
+
+func (r *rect) Intersects(o *rect) bool {
+  if (r.X+r.Width < o.X || r.X > o.X+o.Width) && (r.Y+r.Height < o.Y || r.Y+r.Height > o.Y) {
+    return false
+  }
+  return true
+}
+
+type User struct {
+  ID         string         `json:"id"`
+  Username   string         `json:"username"`
+  Password   string         `json:"password,omitempty"`
+  Attributes userAttributes `json:"attributes"`
+  Position   position       `json:"position"`
+}
+
+func NewUser(username, password string) *User {
+  user := &User{
+    ID:       uuid.NewUUID().String(),
+    Username: username,
+    Password: password,
+    Attributes: userAttributes{
+      Health: 6,
+    },
+    Position: position{
+      Dimensions: rect{
+        Width:  tileWidth,
+        Height: tileWidth * 2,
+      },
+    },
+  }
+  db.Users[user.ID] = user
+  return user
+}
+
+type Guild struct {
+  ID        string   `json:"id"`
+  Name      string   `json:"name"`
+  OwnerID   string   `json:"owner_id"`
+  MemberIDs []string `json:"member_ids"`
+}
+
+func NewGuild(name, ownerID string) *Guild {
+  guild := &Guild{
+    ID:        uuid.NewUUID().String(),
+    Name:      name,
+    OwnerID:   ownerID,
+    MemberIDs: make([]string, 0),
+  }
+  db.Guilds[guild.ID] = guild
+  return guild
+}
+
+const dbname = "db.json"
+
 type database struct {
   users map[string]*User
 }
@@ -86,6 +162,94 @@ type conn struct {
   ws     *websocket.Conn
   send   chan []byte
   userID string
+}
+
+func (c *conn) readPump() {
+  defer func() {
+    h.unregister <- c
+    c.ws.Close()
+  }()
+  c.ws.SetReadLimit(maxMessageSize)
+  c.ws.SetReadDeadline(time.Now().Add(pongWait))
+  c.ws.SetPongHandler(func(string) error {
+    c.ws.SetReadDeadline(time.Now().Add(pongWait))
+    return nil
+  })
+  for {
+    var event event
+    err := c.ws.ReadJSON(&event)
+    if err != nil {
+      break
+    }
+
+    event.UserID = c.userID
+
+    user := db.Users[c.userID]
+
+    switch event.Type {
+    case playerMove:
+      body := event.Body.(moveEvent)
+
+      inc := 5.0
+      switch body.Direction {
+      case north:
+        if user.Position.Dimensions.Y > 0 {
+          user.Position.Dimensions.Y -= inc
+        } else {
+          user.Position.Dimensions.Y += inc
+        }
+      case east:
+        if user.Position.Dimensions.X > 0 {
+          user.Position.Dimensions.X += inc
+        } else {
+          user.Position.Dimensions.X -= inc
+        }
+      case south:
+        if user.Position.Dimensions.Y+user.Position.Dimensions.Height <
+          mapHeight*tileWidth {
+          user.Position.Dimensions.Y += inc
+        } else {
+          user.Position.Dimensions.Y -= inc
+        }
+      case west:
+        if user.Position.Dimensions.X+user.Position.Dimensions.Width <
+          mapWidth*tileWidth {
+          user.Position.Dimensions.X -= inc
+        } else {
+          user.Position.Dimensions.X += inc
+        }
+      }
+
+      event.Body = user.Position
+
+      b, err := json.Marshal(&event)
+      if err != nil {
+        break
+      }
+
+      h.broadcast <- b
+    case playerAttack:
+      for _, v := range db.Users {
+        if user.Position.Dimensions.Intersects(&v.Position.Dimensions) {
+          fmt.Println("Player hit!")
+          //b, err := json.Marshal(&event)
+          //if err != nil {
+          //break
+          //}
+
+          //h.broadcast <- b
+        }
+      }
+
+    case chat:
+      b, err := json.Marshal(&event)
+      if err != nil {
+        break
+      }
+
+      h.broadcast <- b
+    }
+  }
 }
 
 func (c *conn) write(mt int, payload []byte) error {
