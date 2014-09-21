@@ -53,7 +53,7 @@
  "tilesets":[
         {
          "firstgid":1,
-         "image":"..\/..\/archive\/Assets\/grass.png",
+         "image":"Assets\/grass.png",
          "imageheight":16,
          "imagewidth":16,
          "margin":0,
@@ -80,7 +80,7 @@
         }, 
         {
          "firstgid":2,
-         "image":"..\/..\/archive\/Assets\/road.png",
+         "image":"Assets\/road.png",
          "imageheight":16,
          "imagewidth":256,
          "margin":0,
@@ -107,7 +107,7 @@
         }, 
         {
          "firstgid":18,
-         "image":"..\/..\/archive\/Assets\/building.png",
+         "image":"Assets\/building.png",
          "imageheight":16,
          "imagewidth":288,
          "margin":0,
@@ -122,7 +122,7 @@
         }, 
         {
          "firstgid":36,
-         "image":"..\/..\/archive\/Assets\/plats.png",
+         "image":"Assets\/plats.png",
          "imageheight":16,
          "imagewidth":256,
          "margin":0,
@@ -137,7 +137,7 @@
         }, 
         {
          "firstgid":52,
-         "image":"..\/..\/archive\/Assets\/flags.png",
+         "image":"Assets\/flags.png",
          "imageheight":32,
          "imagewidth":48,
          "margin":0,
@@ -152,7 +152,7 @@
         }, 
         {
          "firstgid":55,
-         "image":"..\/..\/archive\/Assets\/girl.png",
+         "image":"Assets\/girl.png",
          "imageheight":16,
          "imagewidth":128,
          "margin":0,
@@ -167,7 +167,7 @@
         }, 
         {
          "firstgid":63,
-         "image":"..\/..\/archive\/Assets\/boy.png",
+         "image":"Assets\/boy.png",
          "imageheight":16,
          "imagewidth":128,
          "margin":0,
@@ -182,7 +182,7 @@
         }, 
         {
          "firstgid":71,
-         "image":"..\/..\/archive\/Assets\/furniture.png",
+         "image":"Assets\/furniture.png",
          "imageheight":16,
          "imagewidth":32,
          "margin":0,
@@ -197,7 +197,7 @@
         }, 
         {
          "firstgid":72,
-         "image":"..\/..\/archive\/Assets\/tim.png",
+         "image":"Assets\/tim.png",
          "imageheight":32,
          "imagewidth":192,
          "margin":0,
