@@ -437,6 +437,13 @@ func createUser(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	for _, v := range db.Users {
+		if v.Username == username {
+			return &httputil.HTTPError{httputil.StatusUnprocessableEntity,
+				errors.New("username taken")}
+		}
+	}
+
 	user := CreateUser(username, password)
 	return renderJSON(w, user, http.StatusCreated)
 }
