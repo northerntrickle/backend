@@ -16,6 +16,7 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/codegangsta/negroni"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/northerntrickle/backend/httputil"
 )
@@ -503,14 +504,17 @@ func main() {
 
 	n := negroni.New()
 
-	http.Handle("/", handler(serveRoot))
-	http.Handle("/static/",
-		http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	r := mux.NewRouter()
 
-	http.Handle("/sign_up", handler(createUser))
-	http.Handle("/login", handler(createJWT))
+	r.Handle("/", handler(serveRoot)).Methods("GET")
+	r.Handle("/static/",
+		http.StripPrefix("/static/",
+			http.FileServer(http.Dir("./static/")))).Methods("GET")
 
-	http.HandleFunc("/connect", serveWs)
+	r.Handle("/sign_up", handler(createUser)).Methods("POST")
+	r.Handle("/login", handler(createJWT)).Methods("POST")
+
+	r.HandleFunc("/connect", serveWs).Methods("GET")
 
 	n.Use(negroni.HandlerFunc(func(w http.ResponseWriter, r *http.Request,
 		next http.HandlerFunc) {
@@ -522,7 +526,7 @@ func main() {
 		next(w, r)
 	}))
 
-	n.UseHandler(http.DefaultServeMux)
+	n.UseHandler(r)
 	n.Run(":" + port)
 }
 
