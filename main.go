@@ -34,7 +34,7 @@ type position struct {
 type User struct {
 	ID         string         `json:"id"`
 	Username   string         `json:"username"`
-	Password   string         `json:"-"`
+	Password   string         `json:"password,omitempty"`
 	Attributes userAttributes `json:"attributes"`
 	Position   position       `json:"position"`
 }
@@ -445,8 +445,10 @@ func main() {
 	http.Handle("/", handler(serveRoot))
 	http.Handle("/static/",
 		http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+
 	http.Handle("/sign_up", handler(createUser))
 	http.Handle("/login", handler(createJWT))
+
 	http.HandleFunc("/connect", serveWs)
 
 	n.Use(negroni.HandlerFunc(func(w http.ResponseWriter, r *http.Request,
@@ -495,6 +497,7 @@ func createUser(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	user := NewUser(username, password)
+	user.Password = ""
 	return renderJSON(w, user, http.StatusCreated)
 }
 
