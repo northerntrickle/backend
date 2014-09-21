@@ -44,11 +44,13 @@ type rect struct {
 }
 
 func (r *rect) Intersects(o *rect) bool {
-	if (r.X+r.Width < o.X || r.X > o.X+o.Width) &&
-		(r.Y+r.Height < o.Y || r.Y+r.Height > o.Y) {
-		return false
+	if r.X < o.X+o.Width &&
+		r.X+r.Width > o.X &&
+		r.Y < o.Y+o.Height &&
+		r.Y+r.Height > o.Y {
+		return true
 	}
-	return true
+	return false
 }
 
 type User struct {
@@ -265,19 +267,19 @@ func (c *conn) readPump() {
 		return nil
 	})
 	for {
-		var event event
-		err := c.ws.ReadJSON(&event)
+		var evt event
+		err := c.ws.ReadJSON(&evt)
 		if err != nil {
 			break
 		}
 
-		event.UserID = c.userID
+		evt.UserID = c.userID
 
 		user := db.Users[c.userID]
 
-		switch event.Type {
+		switch evt.Type {
 		case playerMove:
-			body := event.Body.(moveEvent)
+			body := evt.Body.(moveEvent)
 
 			inc := 5.0
 			switch body.Direction {
@@ -309,9 +311,9 @@ func (c *conn) readPump() {
 				}
 			}
 
-			event.Body = user.Position
+			evt.Body = user.Position
 
-			b, err := json.Marshal(&event)
+			b, err := json.Marshal(&evt)
 			if err != nil {
 				break
 			}
@@ -319,19 +321,27 @@ func (c *conn) readPump() {
 			h.broadcast <- b
 		case playerAttack:
 			for _, v := range db.Users {
-				if user.Position.Dimensions.Intersects(&v.Position.Dimensions) {
-					fmt.Println("Player hit!")
-					//b, err := json.Marshal(&event)
-					//if err != nil {
-					//break
-					//}
+				if user.Username != v.Username &&
+					user.Position.Dimensions.Intersects(&v.Position.Dimensions) {
+					e := event{
+						Type:   chat,
+						UserID: user.ID,
+						Body: chatEvent{
+							Msg: fmt.Sprintf("%s is dominating %s!", user.Username,
+								v.Username),
+						},
+					}
+					b, err := json.Marshal(&e)
+					if err != nil {
+						break
+					}
 
-					//h.broadcast <- b
+					h.broadcast <- b
 				}
 			}
 
 		case chat:
-			b, err := json.Marshal(&event)
+			b, err := json.Marshal(&evt)
 			if err != nil {
 				break
 			}
