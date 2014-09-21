@@ -112,6 +112,7 @@ type eventType int
 const (
 	playerMove eventType = iota
 	playerAttack
+	chat
 )
 
 type event struct {
@@ -133,7 +134,7 @@ func (e *event) UnmarshalJSON(data []byte) error {
 	switch e.Type {
 	case playerMove:
 		var wrapper struct {
-			Body moveEventInput `json:"body"`
+			Body moveEvent `json:"body"`
 		}
 		if err := json.Unmarshal(data, &wrapper); err != nil {
 			return err
@@ -141,6 +142,14 @@ func (e *event) UnmarshalJSON(data []byte) error {
 		e.Body = wrapper.Body
 	case playerAttack:
 		fmt.Println("NOT IMPLEMENTED")
+	case chat:
+		var wrapper struct {
+			Body chatEvent `json:"body"`
+		}
+		if err := json.Unmarshal(data, &wrapper); err != nil {
+			return err
+		}
+		e.Body = wrapper.Body
 	}
 
 	return nil
@@ -155,14 +164,12 @@ const (
 	west
 )
 
-type moveEventInput struct {
+type moveEvent struct {
 	Direction direction `json:"direction"`
 }
 
-type moveEventOutput struct {
-	Direction direction `json:"direction"`
-	X         float64   `json:"x"`
-	Y         float64   `json:"y"`
+type chatEvent struct {
+	Msg string `json:"msg"`
 }
 
 const (
@@ -200,7 +207,7 @@ func (c *conn) readPump() {
 
 		switch event.Type {
 		case playerMove:
-			body := event.Body.(moveEventInput)
+			body := event.Body.(moveEvent)
 			user := db.Users[c.userID]
 
 			inc := 5.0
@@ -218,6 +225,7 @@ func (c *conn) readPump() {
 			event.Body = user.Position
 		case playerAttack:
 			fmt.Println("Player attack!")
+		case chat:
 		}
 
 		b, err := json.Marshal(&event)
