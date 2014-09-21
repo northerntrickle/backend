@@ -43,7 +43,8 @@ type rect struct {
 }
 
 func (r *rect) Intersects(o *rect) bool {
-	if (r.X+r.Width < o.X || r.X > o.X+o.Width) && (r.Y+r.Height < o.Y || r.Y+r.Height > o.Y) {
+	if (r.X+r.Width < o.X || r.X > o.X+o.Width) &&
+		(r.Y+r.Height < o.Y || r.Y+r.Height > o.Y) {
 		return false
 	}
 	return true
