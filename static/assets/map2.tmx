@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="16" tileheight="16">
+ <tileset firstgid="1" name="Grass" tilewidth="16" tileheight="16">
+  <image source="Assets/grass.png" width="16" height="16"/>
+  <terraintypes>
+   <terrain name="Grass" tile="-1"/>
+  </terraintypes>
+  <tile id="0" terrain="0,0,0,0"/>
+ </tileset>
+ <tileset firstgid="2" name="Road" tilewidth="16" tileheight="16">
+  <image source="Assets/road.png" width="256" height="16"/>
+  <terraintypes>
+   <terrain name="Road" tile="-1"/>
+  </terraintypes>
+  <tile id="1" terrain=",,0,0"/>
+ </tileset>
+ <tileset firstgid="18" name="building" tilewidth="16" tileheight="16">
+  <image source="Assets/building.png" width="288" height="16"/>
+ </tileset>
+ <tileset firstgid="36" name="Plants" tilewidth="16" tileheight="16">
+  <image source="Assets/plats.png" width="256" height="16"/>
+ </tileset>
+ <tileset firstgid="52" name="flags" tilewidth="16" tileheight="32">
+  <image source="Assets/flags.png" width="48" height="32"/>
+ </tileset>
+ <tileset firstgid="55" name="girl" tilewidth="16" tileheight="16">
+  <image source="Assets/girl.png" width="128" height="16"/>
+ </tileset>
+ <tileset firstgid="63" name="boy" tilewidth="16" tileheight="16">
+  <image source="Assets/boy.png" width="128" height="16"/>
+ </tileset>
+ <tileset firstgid="71" name="furniture" tilewidth="32" tileheight="16">
+  <image source="Assets/furniture.png" width="32" height="16"/>
+ </tileset>
+ <tileset firstgid="72" name="tim" tilewidth="64" tileheight="32">
+  <image source="Assets/tim.png" width="192" height="32"/>
+ </tileset>
+ <layer name="Grass" width="100" height="100">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA+3DAQkAAAwEofv+pQfLoeCqqaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/wC5xd0EQJwAAA==
+  </data>
+ </layer>
+ <layer name="RoadPlants" width="100" height="100">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA+3cfUsCQRDH8cUKMu3pjyCRnqD0/b/DdugGx3F2NbnzFu77gUGJMtlfs7uXqykB0/Oa67NS7yM8pylb5fqq1Md4T22SyKMt5NEW8hjXk6taFuQxvHtX5NEW5qu2vOR664o82hL1CnmMhzzaQh5tIY+2kEdb7F5Laz3qMwIAAAAAAAAAAACA89ymw/OyvnA581zPXflzs1q4HM3jMdc2Hb43TN4L9pPr2936Qj9sf0Rn++UsjY75d3Bfb9EPP19FeciYb9Iui22iP4Zi5ysZc3/ezPaH74tNoj/6ZvOQsS3lsU3xfEV/9Mv3hz//J2f/fA6bdJgL+uH3VzoH6X3bF9GtriUo0z2r/dwCGTMZX3/995z291e+HrqfrX1GAp+PUKdrgD33Pct1nfbH/5QqrfOcLz9dlIfMK9IbMsaLXFe5btJpeUTrPHmU+bkkGifNQuou/fWL/VotD8ly1T3evPvaqvB7UP7bteNkr/skD527pFdqfSJjL+uH7LvWaZeH3Yfx/ot9/81D1mjtjWU6XNej9UP3UpoHympze7SPsrU096VX5sH3RPsx/hdfVssjysDOUXaMl4XvP6emrJaHvoZhx0rWD7+WL7rHitaS0usitZqy6D2Ofp3VeUjGvZTFrLu1mbBWDEPzkPnJ76n0Oty6SqzdQyrtr2yPyB7YX5uQxzCifZPfQ2mP2KzIYxjH8rC5+OsP9E/Wi2gfdGwftYgeDIOxr38AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD07RfgOVmdQJwAAA==
+  </data>
+ </layer>
+ <layer name="Label" width="100" height="100">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA+3aAQqCMBQA0B3GGl2gK9gxO2oKfRoxK0pt5XswmhIy/Py/TU0JAAAAAAB4x/HbAwAAAAAAAAAAAP7Wbmj7oeWhddfjXJyv6VM6l7/MZ7znEYeIQfS74n+n9Ye2SWV+RAzKuNREXvj2b35lrYpcidjkL45rq8o5I/oRm6n8YDk5yYOWRH2aQz/R57mYi9WltsS8sRRrsLqpWmId1Y5xj/dKvTp8cF2xruvvGnBjLfobYi9OG+JZFW149J6D9dmft0V+tMX8AQAAAAAAAAAAAAAAAAAAAEC4AEUfnfVAnAAA
+  </data>
+ </layer>
+</map>

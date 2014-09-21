@@ -276,6 +276,8 @@ var Game = (function GameClosure(){
         this.game.load.image('tilesFlags', 'static/assets/Assets/flags.png');
         this.game.load.image('tilesBuildings', 'static/assets/Assets/building.png');
         this.game.load.image('tilesGirls', 'static/assets/Assets/girl.png');
+        this.game.load.image('tilesHeart', 'static/assets/Assets/heart.png');
+        //this.game.load.image('tilesBoys', 'static/assets/Assets/boy.png');
         this.game.load.spritesheet('tilesBoys', 'static/assets/Assets/boy.png', 16, 16);
         this.game.load.image('tilesFurniture', 'static/assets/Assets/furniture.png');
         this.game.load.image('tilesTims', 'static/assets/Assets/tim.png');
@@ -313,6 +315,7 @@ var Game = (function GameClosure(){
         map.addTilesetImage('building', 'tilesBuildings');
         map.addTilesetImage('flags', 'tilesFlags', 14, 32);
         map.addTilesetImage('girl', 'tilesGirls', 13, 16);
+        map.addTilesetImage('heart', 'tilesHeart', 13, 16);
         map.addTilesetImage('boy', 'tilesBoys', 13, 16);
         map.addTilesetImage('tim', 'tilesTims');
         var layerGrass = map.createLayer('Grass');
@@ -382,7 +385,7 @@ var Game = (function GameClosure(){
 
         that.cursors = that.game.input.keyboard.createCursorKeys();
         that.fireButton = that.game.input.keyboard.addKey(Phaser.Keyboard.TILDE);
-        that.fireButton.onDown.add(that.input.attack);
+        that.fireButton.onDown.add(function(){that.input.attack()});
       }
     },
 
